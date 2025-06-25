@@ -1,0 +1,80 @@
+# 1. ConfigMap with multiple config values
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  settings.yaml: |
+    appMode: production
+    logLevel: debug
+  db.conf: |
+    host=localhost
+    port=5432
+
+---
+
+# 2. Secret with username and password
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+type: Opaque
+data:
+  username: YWRtaW4=    # base64 for 'admin'
+  password: cGFzc3dvcmQ= # base64 for 'password'
+
+---
+
+# 3. Pod that uses ConfigMap and Secret as env and volume with subPath
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-app
+spec:
+  containers:
+    - name: app-container
+      image: busybox
+      command: [ "sleep", "3600" ]
+
+      # A. ENV VARS from ConfigMap and Secret
+      envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: app-secret
+
+      # B. Volume mounts
+      volumeMounts:
+        # Mount full config directory from ConfigMap
+        - name: config-dir
+          mountPath: /etc/app-config
+
+        # Mount specific config file as /app/settings.yaml
+        - name: config-dir
+          mountPath: /app/settings.yaml
+          subPath: settings.yaml
+
+        # Mount specific db config as /app/db.conf
+        - name: config-dir
+          mountPath: /app/db.conf
+          subPath: db.conf
+
+        # Mount only specific Secret key as file
+        - name: secret-vol
+          mountPath: /secrets/username.txt
+          subPath: username
+        - name: secret-vol
+          mountPath: /secrets/password.txt
+          subPath: password
+
+  volumes:
+    # Volume from ConfigMap
+    - name: config-dir
+      configMap:
+        name: app-config
+
+    # Volume from Secret
+    - name: secret-vol
+      secret:
+        secretName: app-secret
+
